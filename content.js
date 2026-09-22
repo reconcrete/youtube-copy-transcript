@@ -10,6 +10,8 @@
 
   const BUTTON_ID = "yct-copy-transcript-button";
   const DEFAULT_LABEL = "Copy transcript";
+  const DEFAULT_TITLE =
+    "Copy the full transcript to the clipboard (Shift-click to include timestamps)";
   // YouTube ships (at least) two transcript panels: the classic
   // "engagement-panel-searchable-transcript" and the newer "PAmodern_transcript_view".
   // Both are engagement panels whose target-id mentions "transcript".
@@ -18,10 +20,14 @@
   const PANEL_OPEN = "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED";
   const PANEL_HIDDEN = "ENGAGEMENT_PANEL_VISIBILITY_HIDDEN";
 
-  const ICON_SVG =
-    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-    '<path d="M4 4h16v2H4zM4 8h16v2H4zM4 12h16v2H4zM4 16h10v2H4z"/>' +
-    "</svg>";
+  const ICONS = {
+    idle: '<path d="M4 4h16v2H4zM4 8h16v2H4zM4 12h16v2H4zM4 16h10v2H4z"/>',
+    busy: '<path d="M12 4a8 8 0 1 0 8 8h-2a6 6 0 1 1-6-6z"/>',
+    ok: '<path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/>',
+    error: '<path d="M11 7h2v7h-2zm0 8h2v2h-2z"/><path d="M12 2 1 21h22z" fill="none" stroke="currentColor" stroke-width="2"/>',
+  };
+  const iconSvg = (name) =>
+    `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.idle}</svg>`;
 
   // ---------- helpers ----------
 
@@ -277,12 +283,57 @@
   let busy = false;
   let resetTimer = null;
 
+  const STATE_COLORS = { ok: ["#2ba640", "#fff"], error: ["#cc0000", "#fff"] };
+
   function setState(label, state) {
     const button = document.getElementById(BUTTON_ID);
     if (!button) return;
     button.querySelector("span").textContent = label;
+    button.querySelector("svg").outerHTML = iconSvg(state || "idle");
+    button.title = state ? label : DEFAULT_TITLE;
     if (state) button.dataset.state = state;
     else delete button.dataset.state;
+    const colors = STATE_COLORS[state];
+    if (colors) {
+      button.style.setProperty("background-color", colors[0], "important");
+      button.style.setProperty("color", colors[1], "important");
+    } else {
+      styleLikeSiblings(button);
+    }
+  }
+
+  // Match the look of YouTube's own action buttons (size, colours, icon-only or
+  // text) so the button fits whichever action-bar layout YouTube is serving.
+  function styleLikeSiblings(button) {
+    const container = button.parentElement;
+    if (!container) return;
+    const candidates = [...container.querySelectorAll("button")].filter(
+      (el) => el !== button && !button.contains(el) && el.getClientRects().length
+    );
+    const sample =
+      candidates.find((el) => /share/i.test(el.getAttribute("aria-label") || "")) ||
+      candidates.find((el) => !el.closest("segmented-like-dislike-button-view-model")) ||
+      candidates[0];
+    if (!sample) return;
+    const rect = sample.getBoundingClientRect();
+    const style = getComputedStyle(sample);
+    const iconOnly = !sample.textContent.trim() || rect.width <= rect.height + 4;
+    // Belt and braces against container rules such as `> * { flex: 1 1 100% }`.
+    button.style.setProperty("flex", "0 0 auto", "important");
+    button.style.setProperty("max-width", iconOnly ? "none" : "max-content", "important");
+    button.classList.toggle("yct-icon-only", iconOnly);
+    button.style.setProperty("height", `${Math.round(rect.height)}px`, "important");
+    if (iconOnly) button.style.setProperty("width", `${Math.round(rect.height)}px`, "important");
+    else button.style.removeProperty("width");
+    button.style.setProperty("border-radius", style.borderRadius, "important");
+    const transparent = /rgba\(\d+, \d+, \d+, 0\)|transparent/.test(style.backgroundColor);
+    if (transparent) {
+      button.style.removeProperty("background-color");
+      button.style.removeProperty("color");
+    } else {
+      button.style.setProperty("background-color", style.backgroundColor, "important");
+      button.style.setProperty("color", style.color, "important");
+    }
   }
 
   async function copyTranscript(withTimestamps) {
@@ -308,8 +359,8 @@
     button.id = BUTTON_ID;
     button.type = "button";
     button.className = "yct-button";
-    button.title = "Copy the full transcript to the clipboard (Shift-click to include timestamps)";
-    button.innerHTML = `${ICON_SVG}<span>${DEFAULT_LABEL}</span>`;
+    button.title = DEFAULT_TITLE;
+    button.innerHTML = `${iconSvg("idle")}<span>${DEFAULT_LABEL}</span>`;
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -320,13 +371,20 @@
 
   function ensureButton() {
     if (!isWatchPage()) return false;
-    if (document.getElementById(BUTTON_ID)) return true;
+    const existing = document.getElementById(BUTTON_ID);
+    if (existing) {
+      // Keep matching the neighbours: YouTube swaps layouts and themes without reloads.
+      if (!existing.dataset.state) styleLikeSiblings(existing);
+      return true;
+    }
     const container =
       document.querySelector("ytd-watch-metadata #top-level-buttons-computed") ||
       document.querySelector("ytd-watch-metadata #actions-inner") ||
       document.querySelector("ytd-watch-metadata #actions");
     if (!container) return false;
-    container.appendChild(createButton());
+    const button = createButton();
+    container.appendChild(button);
+    styleLikeSiblings(button);
     return true;
   }
 

@@ -1,7 +1,14 @@
 <!doctype html><html dark><head><meta charset="utf-8"><title>fixture</title>
-<style>[visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN"]{display:none} body{background:#0f0f0f;color:#fff;font-family:sans-serif}</style></head>
+<style>
+[visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN"]{display:none} body{background:#0f0f0f;color:#fff;font-family:sans-serif}
+#top-level-buttons-computed{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;width:420px}
+/* hostile rules like the ones YouTube's compact layout applies to children */
+body.compact #top-level-buttons-computed > button{flex:1 1 100%;width:100%}
+body.compact .yt-btn{flex:0 0 auto;width:36px;height:36px;border-radius:18px;background:rgb(240,240,240);color:rgb(15,15,15);border:0;padding:0}
+body.wide .yt-btn{height:36px;border-radius:18px;background:rgb(39,39,39);color:rgb(241,241,241);border:0;padding:0 16px}
+</style></head>
 <body>
-<ytd-watch-metadata><h1>Fixture video</h1><div id="actions"><div id="actions-inner"><div id="top-level-buttons-computed"><button>Like</button><button>Share</button></div></div></div></ytd-watch-metadata>
+<ytd-watch-metadata><h1>Fixture video</h1><div id="actions"><div id="actions-inner"><div id="top-level-buttons-computed"><segmented-like-dislike-button-view-model><button class="yt-btn" aria-label="Like">👍</button></segmented-like-dislike-button-view-model><yt-button-view-model><button class="yt-btn share" aria-label="Share"><span class="label">Share</span></button></yt-button-view-model></div></div></div></ytd-watch-metadata>
 <div id="description">
   <ytd-video-description-transcript-section-renderer><div id="button-container"><button id="show" aria-label="Show transcript">Show transcript</button></div></ytd-video-description-transcript-section-renderer>
 </div>
@@ -23,7 +30,11 @@
   </ytd-engagement-panel-section-list-renderer>
 </div>
 <script>
-const mode = new URLSearchParams(location.search).get("mode") || "classic";
+const params = new URLSearchParams(location.search);
+const mode = params.get("mode") || "classic";
+const layout = params.get("layout") || "wide";
+document.body.classList.add(layout);
+if (layout === "compact") document.querySelectorAll(".yt-btn .label").forEach((l) => l.remove());
 const LINES = [["0:00", "Translator: Someone"], ["0:19", "Hear that?"], ["0:21", "That's nothing."], ["1:05:03", "Late line with hours"]];
 window.__copied = null;
 navigator.clipboard.writeText = async (t) => { window.__copied = t; };

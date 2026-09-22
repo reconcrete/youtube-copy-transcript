@@ -1,10 +1,18 @@
+/* The button must never grow, stretch or wrap onto its own row, whatever
+   flex/grid rules YouTube applies to the action bar. */
 .yct-button {
-  display: inline-flex;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  width: auto;
+  max-width: max-content !important;
+  align-self: center !important;
+  box-sizing: border-box;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   height: 36px;
   padding: 0 16px;
-  margin-left: 8px;
+  margin: 0 0 0 8px !important;
   border: none;
   border-radius: 18px;
   background: rgba(0, 0, 0, 0.05);
@@ -15,11 +23,10 @@
   line-height: 36px;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 0.15s ease;
 }
 
 .yct-button:hover {
-  background: rgba(0, 0, 0, 0.1);
+  filter: brightness(0.92);
 }
 
 /* YouTube marks its dark theme with a `dark` attribute on <html>. */
@@ -29,7 +36,17 @@ html[dark] .yct-button {
 }
 
 html[dark] .yct-button:hover {
-  background: rgba(255, 255, 255, 0.2);
+  filter: brightness(1.25);
+}
+
+/* Compact action bars use icon-only buttons; follow suit. */
+.yct-button.yct-icon-only {
+  padding: 0 !important;
+  gap: 0;
+}
+
+.yct-button.yct-icon-only span {
+  display: none;
 }
 
 .yct-button svg {
@@ -44,12 +61,12 @@ html[dark] .yct-button:hover {
   cursor: progress;
 }
 
-.yct-button[data-state="ok"] {
-  background: #2ba640;
-  color: #fff;
+.yct-button[data-state="busy"] svg {
+  animation: yct-spin 0.9s linear infinite;
 }
 
-.yct-button[data-state="error"] {
-  background: #cc0000;
-  color: #fff;
+@keyframes yct-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
