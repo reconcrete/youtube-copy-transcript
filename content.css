@@ -1,0 +1,45 @@
+.yct-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  margin-left: 8px;
+  border: none;
+  border-radius: 18px;
+  background: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05));
+  color: var(--yt-spec-text-primary, #0f0f0f);
+  font-family: "Roboto", "Arial", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 36px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.yct-button:hover {
+  background: var(--yt-spec-button-chip-background-hover, rgba(0, 0, 0, 0.1));
+}
+
+.yct-button svg {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+  flex-shrink: 0;
+}
+
+.yct-button[data-state="busy"] {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.yct-button[data-state="ok"] {
+  background: #2ba640;
+  color: #fff;
+}
+
+.yct-button[data-state="error"] {
+  background: #cc0000;
+  color: #fff;
+}
