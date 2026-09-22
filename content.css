@@ -7,8 +7,8 @@
   margin-left: 8px;
   border: none;
   border-radius: 18px;
-  background: var(--yt-spec-badge-chip-background, rgba(0, 0, 0, 0.05));
-  color: var(--yt-spec-text-primary, #0f0f0f);
+  background: rgba(0, 0, 0, 0.05);
+  color: #0f0f0f;
   font-family: "Roboto", "Arial", sans-serif;
   font-size: 14px;
   font-weight: 500;
@@ -19,7 +19,17 @@
 }
 
 .yct-button:hover {
-  background: var(--yt-spec-button-chip-background-hover, rgba(0, 0, 0, 0.1));
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* YouTube marks its dark theme with a `dark` attribute on <html>. */
+html[dark] .yct-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1f1f1;
+}
+
+html[dark] .yct-button:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .yct-button svg {

@@ -64,7 +64,9 @@
     let panel = getPanel();
     if (isPanelOpen(panel)) return { panel, wasOpen: true };
 
-    const button = findShowTranscriptButton();
+    // The description (and its "Show transcript" button) renders a bit after
+    // the action bar, so give it a moment instead of failing on a fast click.
+    const button = await waitFor(findShowTranscriptButton, { timeout: 8000 });
     if (!button) return { panel: null, wasOpen: false };
     button.click();
 
@@ -107,7 +109,7 @@
         const found = readSegments(panel);
         return found.length ? found : null;
       },
-      { timeout: 10000 }
+      { timeout: 20000 }
     );
 
     if (!wasOpen) closeTranscriptPanel(panel);
