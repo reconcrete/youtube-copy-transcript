@@ -25,20 +25,24 @@ if it was closed before.
 
 1. On every watch page (also after YouTube's in-app navigation, via the `yt-navigate-finish` event)
    it injects a button into the action bar (`#top-level-buttons-computed`).
-2. On click it presses YouTube's own **Show transcript** button if the transcript panel is closed,
-   waits for the `ytd-transcript-segment-renderer` elements to appear, reads `.segment-timestamp`
-   and `.segment-text` from each of them and joins the lines.
-3. The text goes to the clipboard through `navigator.clipboard.writeText`, with a
+2. On click it presses YouTube's own **Show transcript** button if the transcript panel is closed
+   and waits for whichever transcript panel YouTube opens (the classic
+   `engagement-panel-searchable-transcript` or the 2026 `PAmodern_transcript_view`).
+3. It reads the lines with the first reader that finds any: the classic
+   `ytd-transcript-segment-renderer` markup, the modern `transcript-segment-view-model` markup,
+   or a markup-agnostic fallback that treats every `m:ss` text in the panel as the start of a line.
+4. The text goes to the clipboard through `navigator.clipboard.writeText`, with a
    `document.execCommand("copy")` fallback.
-4. If the panel was closed before, it is closed again.
+5. If the panel was closed before, it is closed again.
 
 `background.js` only forwards toolbar-icon clicks to the content script.
 
 ## Limitations
 
 - Works only when YouTube offers a transcript for the video (most videos with captions do).
-- Relies on YouTube's DOM (`ytd-*` elements). If YouTube changes its markup the selectors in
-  `content.js` may need an update.
+- Relies on YouTube's DOM. If YouTube changes its markup again, the fallback reader should still
+  cope; if the button says **No transcript** while the panel shows text, open DevTools and copy the
+  `YouTube Copy Transcript: no segments found` warning into an issue.
 - The transcript is copied in whatever language the transcript panel is currently set to.
 
 ## License

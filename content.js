@@ -10,9 +10,12 @@
 
   const BUTTON_ID = "yct-copy-transcript-button";
   const DEFAULT_LABEL = "Copy transcript";
-  const PANEL_SELECTOR =
-    'ytd-engagement-panel-section-list-renderer[target-id="engagement-panel-searchable-transcript"]';
+  // YouTube ships (at least) two transcript panels: the classic
+  // "engagement-panel-searchable-transcript" and the newer "PAmodern_transcript_view".
+  // Both are engagement panels whose target-id mentions "transcript".
+  const PANEL_SELECTOR = "[target-id*='transcript' i]";
   const SEGMENT_SELECTOR = "ytd-transcript-segment-renderer";
+  const TIMESTAMP_RE = /^\d{1,2}:\d{2}(?::\d{2})?$/;
   const PANEL_OPEN = "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED";
   const PANEL_HIDDEN = "ENGAGEMENT_PANEL_VISIBILITY_HIDDEN";
 
@@ -39,9 +42,10 @@
 
   // ---------- transcript panel ----------
 
-  const getPanel = () => document.querySelector(PANEL_SELECTOR);
   const isPanelOpen = (panel) =>
     Boolean(panel) && panel.getAttribute("visibility") === PANEL_OPEN;
+  const getOpenPanel = () =>
+    [...document.querySelectorAll(PANEL_SELECTOR)].find(isPanelOpen) || null;
 
   function findShowTranscriptButton() {
     const section = document.querySelector(
@@ -61,8 +65,8 @@
   }
 
   async function openTranscriptPanel() {
-    let panel = getPanel();
-    if (isPanelOpen(panel)) return { panel, wasOpen: true };
+    let panel = getOpenPanel();
+    if (panel) return { panel, wasOpen: true };
 
     // The description (and its "Show transcript" button) renders a bit after
     // the action bar, so give it a moment instead of failing on a fast click.
@@ -70,13 +74,7 @@
     if (!button) return { panel: null, wasOpen: false };
     button.click();
 
-    panel = await waitFor(
-      () => {
-        const candidate = getPanel();
-        return isPanelOpen(candidate) ? candidate : null;
-      },
-      { timeout: 5000 }
-    );
+    panel = await waitFor(getOpenPanel, { timeout: 5000 });
     return { panel, wasOpen: false };
   }
 
@@ -88,16 +86,88 @@
     else panel.setAttribute("visibility", PANEL_HIDDEN);
   }
 
-  function readSegments(panel) {
+  const normalize = (text) => text.replace(/\s+/g, " ").trim();
+
+  // Classic markup: <ytd-transcript-segment-renderer> with .segment-timestamp / .segment-text.
+  function readSegmentsClassic(panel) {
     const segments = [];
     for (const node of panel.querySelectorAll(SEGMENT_SELECTOR)) {
-      const time = (node.querySelector(".segment-timestamp")?.textContent || "").trim();
-      const text = (node.querySelector(".segment-text")?.textContent || "")
-        .replace(/\s+/g, " ")
-        .trim();
+      const time = normalize(node.querySelector(".segment-timestamp")?.textContent || "");
+      const text = normalize(node.querySelector(".segment-text")?.textContent || "");
       if (text) segments.push({ time, text });
     }
     return segments;
+  }
+
+  // Markup-agnostic fallback: every visible "m:ss" / "h:mm:ss" text node in the
+  // panel is a timestamp; the smallest ancestor that holds exactly one timestamp
+  // is that segment's row, and the row's remaining text is the caption.
+  function readSegmentsGeneric(panel) {
+    const stamps = [];
+    const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (TIMESTAMP_RE.test(node.textContent.trim())) stamps.push(node.parentElement);
+    }
+
+    const segments = [];
+    const seenRows = new Set();
+    stamps.forEach((stampEl, index) => {
+      const prev = stamps[index - 1];
+      const next = stamps[index + 1];
+      let row = stampEl;
+      while (
+        row.parentElement &&
+        row.parentElement !== panel &&
+        !(prev && row.parentElement.contains(prev)) &&
+        !(next && row.parentElement.contains(next))
+      ) {
+        row = row.parentElement;
+      }
+      if (seenRows.has(row)) return;
+      seenRows.add(row);
+
+      const time = normalize(stampEl.textContent);
+      const rowText = normalize(row.innerText || row.textContent || "");
+      const text = normalize(rowText.replace(time, ""));
+      if (text) segments.push({ time, text });
+    });
+    return segments;
+  }
+
+  // Modern markup (YouTube's 2026 "PAmodern_transcript_view" panel):
+  // <transcript-segment-view-model> rows with a timestamp span and an attributed string.
+  function readSegmentsModern(panel) {
+    const segments = [];
+    const rows = panel.querySelectorAll(
+      "transcript-segment-view-model, .ytwTranscriptSegmentViewModelHost"
+    );
+    for (const row of rows) {
+      const time = normalize(
+        row.querySelector(".ytwTranscriptSegmentViewModelTimestamp")?.textContent || ""
+      );
+      let text = normalize(
+        row.querySelector('.ytAttributedStringHost[role="text"], yt-attributed-string')
+          ?.textContent || ""
+      );
+      if (!text) text = normalize(normalize(row.textContent || "").replace(time, ""));
+      if (text) segments.push({ time, text });
+    }
+    return segments;
+  }
+
+  function readSegments(panel) {
+    return (
+      [readSegmentsClassic, readSegmentsModern, readSegmentsGeneric]
+        .map((reader) => reader(panel))
+        .find((segments) => segments.length) || []
+    );
+  }
+
+  function describePanel(panel) {
+    const tags = new Set();
+    panel.querySelectorAll("*").forEach((el) => tags.add(el.tagName.toLowerCase()));
+    return [...tags].filter((t) => t.includes("-")).join(", ");
   }
 
   async function getTranscript() {
@@ -112,8 +182,18 @@
       { timeout: 20000 }
     );
 
+    if (!segments) {
+      // Leave the panel open so the user can see what YouTube rendered, and
+      // log its custom elements so the markup can be supported.
+      console.warn(
+        "YouTube Copy Transcript: no segments found in panel",
+        panel.getAttribute("target-id"),
+        "| elements:",
+        describePanel(panel)
+      );
+      throw new Error("NO_TRANSCRIPT");
+    }
     if (!wasOpen) closeTranscriptPanel(panel);
-    if (!segments) throw new Error("NO_TRANSCRIPT");
     return segments;
   }
 
