@@ -1,0 +1,45 @@
+<!doctype html><html dark><head><meta charset="utf-8"><title>fixture</title>
+<style>[visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN"]{display:none} body{background:#0f0f0f;color:#fff;font-family:sans-serif}</style></head>
+<body>
+<ytd-watch-metadata><h1>Fixture video</h1><div id="actions"><div id="actions-inner"><div id="top-level-buttons-computed"><button>Like</button><button>Share</button></div></div></div></ytd-watch-metadata>
+<div id="description">
+  <ytd-video-description-transcript-section-renderer><div id="button-container"><button id="show" aria-label="Show transcript">Show transcript</button></div></ytd-video-description-transcript-section-renderer>
+</div>
+<div id="panels">
+  <ytd-engagement-panel-section-list-renderer target-id="engagement-panel-searchable-transcript" visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN">
+    <div id="header"><ytd-engagement-panel-title-header-renderer><h2>Transcript</h2><div id="visibility-button"><button aria-label="Close transcript">x</button></div></ytd-engagement-panel-title-header-renderer></div>
+    <div id="content"></div>
+  </ytd-engagement-panel-section-list-renderer>
+  <ytd-engagement-panel-section-list-renderer target-id="PAmodern_transcript_view" visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN">
+    <div id="header"><ytd-engagement-panel-title-header-renderer><h2>Transcript</h2><div id="visibility-button"><button aria-label="Close transcript">x</button></div></ytd-engagement-panel-title-header-renderer></div>
+    <div id="content"></div>
+  </ytd-engagement-panel-section-list-renderer>
+  <ytd-engagement-panel-section-list-renderer target-id="PAsomething_new" visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN">
+    <div id="header"><h2>Video text</h2><div id="visibility-button"><button>x</button></div></div>
+    <div id="content"></div>
+  </ytd-engagement-panel-section-list-renderer>
+  <ytd-engagement-panel-section-list-renderer target-id="engagement-panel-macro-markers-auto-chapters" visibility="ENGAGEMENT_PANEL_VISIBILITY_HIDDEN">
+    <div id="content"><div class="chapter"><span>0:00</span> Intro chapter (hidden, must be ignored)</div><div class="chapter"><span>1:00</span> Second chapter</div></div>
+  </ytd-engagement-panel-section-list-renderer>
+</div>
+<script>
+const mode = new URLSearchParams(location.search).get("mode") || "classic";
+const LINES = [["0:00", "Translator: Someone"], ["0:19", "Hear that?"], ["0:21", "That's nothing."], ["1:05:03", "Late line with hours"]];
+window.__copied = null;
+navigator.clipboard.writeText = async (t) => { window.__copied = t; };
+document.querySelectorAll("#visibility-button button").forEach((b) => b.addEventListener("click", () => b.closest("ytd-engagement-panel-section-list-renderer").setAttribute("visibility", "ENGAGEMENT_PANEL_VISIBILITY_HIDDEN")));
+document.getElementById("show").addEventListener("click", () => {
+  const id = { classic: "engagement-panel-searchable-transcript", modern: "PAmodern_transcript_view", unknown: "PAsomething_new" }[mode];
+  const panel = document.querySelector(`[target-id="${id}"]`);
+  setTimeout(() => {
+    panel.setAttribute("visibility", "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED");
+    const content = panel.querySelector("#content");
+    content.innerHTML = '<div class="loading">Loading…</div>';
+    setTimeout(() => {
+      if (mode === "classic") content.innerHTML = '<ytd-transcript-segment-list-renderer><div id="segments-container">' + LINES.map(([t, x]) => `<ytd-transcript-segment-renderer><div class="segment"><div class="segment-timestamp">${t}</div><yt-formatted-string class="segment-text">${x}</yt-formatted-string></div></ytd-transcript-segment-renderer>`).join("") + '</div></ytd-transcript-segment-list-renderer>';
+      else if (mode === "modern") content.innerHTML = '<yt-section-list-renderer data-target-id="PAmodern_transcript_view"><macro-markers-panel-item-view-model><timeline-chapter-view-model><span class="ytwTimelineChapterViewModelTitle">Chapter one</span></timeline-chapter-view-model>' + LINES.map(([t, x]) => `<transcript-segment-view-model class="ytwTranscriptSegmentViewModelHost"><div class="ytwTranscriptSegmentViewModelTimestamp">${t}</div><yt-attributed-string class="ytAttributedStringHost" role="text"><span>${x}</span></yt-attributed-string></transcript-segment-view-model>`).join("") + '</macro-markers-panel-item-view-model></yt-section-list-renderer>';
+      else content.innerHTML = '<div class="list"><div class="sub">English (auto-generated)</div>' + LINES.map(([t, x]) => `<div class="row"><button class="ts"><span>${t}</span></button><div class="txt"><p>${x}</p></div></div>`).join("") + '</div>';
+    }, 300);
+  }, 100);
+});
+</script></body></html>

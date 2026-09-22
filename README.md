@@ -45,6 +45,19 @@ if it was closed before.
   `YouTube Copy Transcript: no segments found` warning into an issue.
 - The transcript is copied in whatever language the transcript panel is currently set to.
 
+## Testing
+
+`test/fixture.html` imitates a watch page with three transcript panel variants (classic
+`ytd-transcript-segment-renderer` markup, the 2026 `transcript-segment-view-model` markup, and an
+unlabelled panel with arbitrary markup). `test/test_fixture.py` launches a Chromium with the
+extension loaded, injects `content.js` into the fixture and checks that every variant copies the
+expected text, with and without timestamps. It needs Python 3 with the `websockets` package and a
+Chromium build that honours `--load-extension` (Chrome for Testing, Chromium, not branded Chrome):
+
+```
+python3 test/test_fixture.py "/path/to/Google Chrome for Testing"
+```
+
 ## License
 
 [MIT](LICENSE)

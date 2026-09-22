@@ -13,7 +13,6 @@
   // YouTube ships (at least) two transcript panels: the classic
   // "engagement-panel-searchable-transcript" and the newer "PAmodern_transcript_view".
   // Both are engagement panels whose target-id mentions "transcript".
-  const PANEL_SELECTOR = "[target-id*='transcript' i]";
   const SEGMENT_SELECTOR = "ytd-transcript-segment-renderer";
   const TIMESTAMP_RE = /^\d{1,2}:\d{2}(?::\d{2})?$/;
   const PANEL_OPEN = "ENGAGEMENT_PANEL_VISIBILITY_EXPANDED";
@@ -42,10 +41,26 @@
 
   // ---------- transcript panel ----------
 
-  const isPanelOpen = (panel) =>
-    Boolean(panel) && panel.getAttribute("visibility") === PANEL_OPEN;
-  const getOpenPanel = () =>
-    [...document.querySelectorAll(PANEL_SELECTOR)].find(isPanelOpen) || null;
+  const panelId = (panel) =>
+    panel.getAttribute("target-id") ||
+    panel.getAttribute("data-target-id") ||
+    panel.querySelector("[data-target-id]")?.getAttribute("data-target-id") ||
+    "";
+  const panelTitle = (panel) =>
+    panel.querySelector("ytd-engagement-panel-title-header-renderer, #header, h2")?.textContent ||
+    "";
+  const expandedPanels = () => [
+    ...document.querySelectorAll(`[visibility="${PANEL_OPEN}"]`),
+  ];
+  // The open transcript panel: identified by its id, or failing that by its title.
+  function getOpenPanel() {
+    const panels = expandedPanels();
+    return (
+      panels.find((panel) => /transcript/i.test(panelId(panel))) ||
+      panels.find((panel) => /transcript/i.test(panelTitle(panel))) ||
+      null
+    );
+  }
 
   function findShowTranscriptButton() {
     const section = document.querySelector(
@@ -71,11 +86,27 @@
     // The description (and its "Show transcript" button) renders a bit after
     // the action bar, so give it a moment instead of failing on a fast click.
     const button = await waitFor(findShowTranscriptButton, { timeout: 8000 });
-    if (!button) return { panel: null, wasOpen: false };
+    if (!button) return { panel: null, wasOpen: false, reason: "no Show transcript button" };
+
+    const openBefore = new Set(expandedPanels());
     button.click();
 
-    panel = await waitFor(getOpenPanel, { timeout: 5000 });
-    return { panel, wasOpen: false };
+    // Prefer a panel that identifies itself as the transcript; otherwise take
+    // whichever panel the click opened, whatever YouTube calls it this week.
+    panel = await waitFor(
+      () => getOpenPanel() || expandedPanels().find((candidate) => !openBefore.has(candidate)) || null,
+      { timeout: 8000 }
+    );
+    return { panel, wasOpen: false, reason: panel ? "" : "no panel opened" };
+  }
+
+  function describePanels() {
+    return [...document.querySelectorAll("[visibility], [target-id], [data-target-id]")]
+      .map(
+        (el) =>
+          `${el.tagName.toLowerCase()}[${panelId(el) || "-"}]=${(el.getAttribute("visibility") || "-").replace("ENGAGEMENT_PANEL_VISIBILITY_", "")}`
+      )
+      .join(" ");
   }
 
   function closeTranscriptPanel(panel) {
@@ -107,7 +138,10 @@
     const walker = document.createTreeWalker(panel, NodeFilter.SHOW_TEXT);
     let node;
     while ((node = walker.nextNode())) {
-      if (TIMESTAMP_RE.test(node.textContent.trim())) stamps.push(node.parentElement);
+      const el = node.parentElement;
+      if (TIMESTAMP_RE.test(node.textContent.trim()) && el && el.getClientRects().length) {
+        stamps.push(el);
+      }
     }
 
     const segments = [];
@@ -171,8 +205,16 @@
   }
 
   async function getTranscript() {
-    const { panel, wasOpen } = await openTranscriptPanel();
-    if (!panel) throw new Error("NO_TRANSCRIPT");
+    const { panel, wasOpen, reason } = await openTranscriptPanel();
+    if (!panel) {
+      console.warn(
+        "YouTube Copy Transcript: transcript panel not found:",
+        reason,
+        "| panels:",
+        describePanels()
+      );
+      throw new Error("NO_TRANSCRIPT");
+    }
 
     const segments = await waitFor(
       () => {
@@ -187,9 +229,11 @@
       // log its custom elements so the markup can be supported.
       console.warn(
         "YouTube Copy Transcript: no segments found in panel",
-        panel.getAttribute("target-id"),
+        panelId(panel) || panel.tagName.toLowerCase(),
         "| elements:",
-        describePanel(panel)
+        describePanel(panel),
+        "| panels:",
+        describePanels()
       );
       throw new Error("NO_TRANSCRIPT");
     }
